@@ -1,0 +1,117 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE)
+
+```
+
+
+```{r}
+df <- readr::read_csv("DOHMH_New_York_City_Restaurant_Inspection_Results.csv")
+#str(df)
+```
+
+```{r}
+library(plotly)
+library(forcats)
+library(wordcloud2)
+library(tm)
+library(tidytext)
+library(DT)
+library(corpus)
+library(dplyr)
+
+```
+
+
+
+```{r}
+#replace NA from "Action" column
+df$ACTION = ifelse(is.na(df$ACTION),"Not yet received an inspection",df$ACTION)
+
+
+#####Just for histogram......
+f <- list(
+  family = "Courier New, monospace",
+  size = 18,
+  color = "#7f7f7f"
+)
+x <- list(
+  title = "",
+  titlefont = f
+) 
+
+df%>%filter(ACTION!="Not yet received an inspection" & ACTION!= "No violations were recorded at the time of this inspection.")%>%select(`CUISINE DESCRIPTION`)%>%plot_ly(x = ~`CUISINE DESCRIPTION`,alpha = 0.6,type = "histogram")%>%layout(xaxis = x)
+
+
+```
+
+```{r}
+
+#####restaurant with violations bar chart vertical
+  
+df%>%filter(ACTION!="Not yet received an inspection" & ACTION!= "No violations were recorded at the time of this inspection.")%>%select(DBA)%>%count(DBA,sort = TRUE)%>%mutate(DBA = fct_reorder(DBA, n))%>%top_n(20)%>%plot_ly(x = ~n, y = ~DBA ,type = 'bar', orientation = 'h')
+
+
+```
+
+
+```{r}
+#### just try bubble chart
+df%>%filter(ACTION!="Not yet received an inspection" & ACTION!= "No violations were recorded at the time of this inspection.")%>%count(DBA)%>%top_n(20)%>%rename(restaurant=DBA, freq = n)%>%
+plot_ly(x = ~restaurant, y = ~freq, type = 'scatter', mode = 'markers',color = ~freq/50,colors = 'Reds',marker = list(size = ~freq/50, opacity = 0.5)) %>%
+  layout(title = 'Top 20 violation restaurant',
+         xaxis = list(showgrid = FALSE),
+         yaxis = list(showgrid = FALSE))
+
+```
+
+
+```{r}
+#Grade 
+df%>%plot_ly(x = ~GRADE)
+
+```
+
+```{r}
+#score grade box plot
+df%>%plot_ly( x = ~GRADE, y = ~SCORE, color = ~GRADE,type = "box")
+```
+
+```{r}
+#viloation description
+df%>%select(`VIOLATION DESCRIPTION`)%>%count(`VIOLATION DESCRIPTION`,sort = TRUE)%>%plot_ly(x = ~`VIOLATION DESCRIPTION`, y =~n ,type = "bar")
+
+```
+
+
+
+```{r}
+
+####word cloud
+viloation<-df%>%filter(ACTION!="Not yet received an inspection" & ACTION!= "No violations were recorded at the time of this inspection." & `CRITICAL FLAG`=="Critical")
+
+
+vio_corpus <- VCorpus(VectorSource(viloation$`VIOLATION DESCRIPTION`))%>%
+  tm_map(content_transformer(tolower))%>%
+  tm_map(removePunctuation)%>%
+  tm_map(removeNumbers)%>%
+  tm_map(removeWords, stopwords("english"))%>%
+  tm_map(stripWhitespace)
+  #tm_map(stemDocument)
+
+
+
+tdm <- TermDocumentMatrix(vio_corpus)
+tdm.tidy <- tidy(tdm)
+viola <- summarise(group_by(tdm.tidy,term),sum(count))
+top_50  <- viola %>% top_n(100)
+wordcloud2(top_50,color='random-light',
+           size=0.5,shape = 'star')
+
+```
