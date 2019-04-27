@@ -1,0 +1,34 @@
+---
+title: "Data_Preprocessing"
+author: "Xiaowo Sun"
+date: "4/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tibble)
+library(funModeling) 
+library(tidyverse) 
+library(Hmisc)
+```
+
+```{r}
+df = read.csv("../DOHMH_New_York_City_Restaurant_Inspection_Results.csv")
+```
+```{r}
+head(df,40)
+```
+
+
+```{r}
+colSums(is.na(df)) %>%
+  sort(decreasing = TRUE)
+```
+```{r}
+df_status(df)
+```
+
