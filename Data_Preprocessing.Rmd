@@ -2,7 +2,9 @@
 title: "Data_Preprocessing"
 author: "Xiaowo Sun"
 date: "4/18/2019"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -11,24 +13,192 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tibble)
-library(funModeling) 
 library(tidyverse) 
+library(dplyr)
 library(Hmisc)
+library(funModeling)
+library(stringr)
+library(readr)
 ```
 
 ```{r}
-df = read.csv("../DOHMH_New_York_City_Restaurant_Inspection_Results.csv")
-```
-```{r}
-head(df,40)
+df = read.csv("../../DOHMH_New_York_City_Restaurant_Inspection_Results.csv", 
+              na.strings=c(c("", "N/A"), "NA"), stringsAsFactors=FALSE)
 ```
 
+```{r}
+head(df,10)
+```
 
 ```{r}
-colSums(is.na(df)) %>%
+df$CAMIS = as.character(df$CAMIS)
+df$ZIPCODE = as.character(df$ZIPCODE)
+```
+
+```{r}
+df_inspected = df[df$INSPECTION.DATE!="01/01/1900",]
+```
+
+```{r}
+basic_eda <- function(data)
+{
+  glimpse(data)
+  df_status(data)
+  freq(data) 
+  profiling_num(data)
+  plot_num(data)
+  describe(data)
+}
+
+basic_eda(df_inspected)
+```
+
+```{r}
+colSums(is.na(df_inspected)) %>%
   sort(decreasing = TRUE)
 ```
+
+#### BORO
 ```{r}
-df_status(df)
+df_inspected[df_inspected$BORO=="Missing",]
+unique(df_inspected[df_inspected$BORO=="Missing",]$CAMIS)
+
+df_inspected$BORO[df_inspected$CAMIS == "40883586"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50005059"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50005134"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50011555"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50043829"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50047425"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50049804"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50060598"] <- "MANHATTAN"
+
+freq(df_inspected$BORO) 
 ```
 
+#### ZIPCODE
+```{r}
+df_inspected[is.na(df_inspected$ZIPCODE),]
+unique(df_inspected[is.na(df_inspected$ZIPCODE),]$CAMIS)
+```
+
+#### PHONE
+```{r}
+sp_char <- "_"
+df_inspected$PHONE  <- gsub(sp_char, "", df_inspected$PHONE)
+df_inspected$PHONE[nchar(df_inspected$PHONE) != 10] <- NA 
+df_inspected$PHONE[df_inspected$PHONE=='0000000000'] <- NA
+```
+
+#### CUISINE.DESCRIPTION
+```{r}
+freq(df_inspected$CUISINE.DESCRIPTION)
+```
+```{r}
+df_inspected$CUISINE.DESCRIPTION[df_inspected$CUISINE.DESCRIPTION == "CafÃ©/Coffee/Tea"] <- "Cafe/Coffee/Tea"
+```
+
+#### SCORE
+```{r}
+boxplot(df_inspected$SCORE)
+summary(df_inspected$SCORE)
+```
+
+```{r}
+df_inspected$SCORE[!is.na(df_inspected$SCORE) & df_inspected$SCORE == -1] <- NA
+```
+
+```{r}
+write.csv(df_inspected, file="cleaned.csv")
+```
+
+```{r}
+df_inspected
+```
+
+#### Create Variables (for potential use)
+```{r}
+df_inspected$INSPECTION.DATE.convert = as.Date(df_inspected$INSPECTION.DATE, "%m/%d/%Y")
+df_inspected$GRADE.DATE.convert = as.Date(df_inspected$GRADE.DATE, "%m/%d/%Y")
+
+df_inspected$Address = paste(df_inspected$BUILDING, df_inspected$STREET, sep=" ")
+df_inspected$Address = paste(df_inspected$Address, df_inspected$BORO, sep=", ")
+df_inspected$State <- paste('NY', df_inspected$ZIPCODE, sep=" ")
+df_inspected$Address = paste(df_inspected$Address, df_inspected$State, sep=", ")
+```
+
+```{r}
+head(df_inspected)
+```
+
+```{r}
+write.csv(df_inspected, file="cleaned_add.csv")
+```
+
+#### Recent Grade
+```{r}
+Inspections <- df_inspected %>%
+    filter((`INSPECTION.TYPE` %in% 
+            c('Cycle Inspection / Re-inspection'
+              ,'Pre-permit (Operational) / Re-inspection')
+          |(`INSPECTION.TYPE` %in%
+              c('Cycle Inspection / Initial Inspection'
+                ,'Pre-permit (Operational) / Initial Inspection')) 
+          & SCORE <= 13)
+         | (`INSPECTION.TYPE` %in%  
+              c('Pre-permit (Operational) / Reopening Inspection'
+                ,'Cycle Inspection / Reopening Inspection'))
+         & GRADE %in% c('A', 'B', 'C', 'P', 'Z')) %>%
+  select(CAMIS,`INSPECTION.DATE`)
+
+#Select distinct inspections
+Inspections_Distinct <- distinct(Inspections)
+
+#Select most recent inspection date
+MostRecentInsp <- Inspections_Distinct %>%
+  group_by(CAMIS) %>%
+  slice(which.max(as.Date(`INSPECTION.DATE`,'%m/%d/%Y')))
+
+#Join most recent inspection with original dataset
+inner_join(df_inspected, MostRecentInsp, by = "CAMIS","INSPECTION.DATE")
+
+#Select restaurant inspection data based on most recent inspection date
+Final <- df_inspected %>% inner_join(MostRecentInsp) %>%
+    filter((`INSPECTION.TYPE` %in% 
+            c('Cycle Inspection / Re-inspection'
+              ,'Pre-permit (Operational) / Re-inspection'
+              , 'Pre-permit (Operational) / Reopening Inspection' 
+              ,'Cycle Inspection / Reopening Inspection')
+          |(`INSPECTION.TYPE` %in%
+              c('Cycle Inspection / Initial Inspection'
+                ,'Pre-permit (Operational) / Initial Inspection')) 
+          & SCORE <= 13)) %>%
+  
+  select(CAMIS,DBA,`INSPECTION.DATE`,GRADE,`INSPECTION.TYPE`,SCORE)
+
+#Select distinct restaurant inspection data
+Final <- distinct(Final)
+
+```
+
+```{r}
+write.csv(Final, file="recent_grade_per_restaurant.csv")
+```
+
+# Missing Value
+```{r}
+colSums(is.na(df_inspected)) %>%
+  sort(decreasing = TRUE)
+```
+
+
+
+```{r}
+library(mi)
+df_na <- df_inspected[, 1:18]
+df_na
+```
+
+```{r}
+x <- missing_data.frame(df_na)
+x
+```
