@@ -181,6 +181,11 @@ Final <- distinct(Final)
 ```
 
 ```{r}
+Final
+```
+
+
+```{r}
 write.csv(Final, file="recent_grade_per_restaurant.csv")
 ```
 
