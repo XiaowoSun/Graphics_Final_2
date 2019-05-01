@@ -29,7 +29,7 @@ library(extracat)
 
 New York City is a heaven for food-loving people, who will find many opportunities to sample cuisine from all cultures and at every price level, from street vendors to the finest high-end restaurants. The challenge for us foodies may be in determining which place to go to so that we can enjoy a fantastic meal.
 
-However, there were several times for us that, although the food tasted great, we felt sick or uncomfortable afterwards and thought it might have something to do with the food. Sometimes it can be hard to tell if it is the food poisoning or something else, but if we pay attention to the food safety and health issues while choosing a restaurant, the chance of getting foodborne illness can be elimiated.
+However, there were several times for us that, although the food tasted great, we felt sick or uncomfortable afterward and thought it might have something to do with the food. Sometimes it can be hard to tell if it is the food poisoning or something else, but if we pay attention to the food safety and health issues while choosing a restaurant, the chance of getting foodborne illness can be eliminated.
 
 Therefore, we would like to take a look into the restaurant inspection conducted by the Department of Health and Mental Hygiene (DOHMH), in order to gain some insights and have a sense of the food safety issues for the restaurants in New York City.
 
@@ -90,7 +90,7 @@ ggplot(df_inspected, aes(x=fct_rev(fct_infreq(BORO)))) +
 ```
 For `ZIPCODE`, most of the missing value can be filled with the help of Google Geocoding.
 
-For `PHONE`, there are some special characters that represents the missing digits in the phone numbers. Some phone numbers have less than 10 digits or simply consist of 10 digits of "0". We converted these values as `NA` at this moment.
+For `PHONE`, there are some special characters that represent the missing digits in the phone numbers. Some phone numbers have less than 10 digits or simply consist of 10 digits of "0". We converted these values as `NA` at this moment.
 ```{r, message=FALSE, warning=FALSE}
 sp_char <- "_"
 df_inspected$PHONE  <- gsub(sp_char, "", df_inspected$PHONE)
@@ -133,10 +133,11 @@ df_inspected$Address = paste(df_inspected$Address, df_inspected$State, sep=", ")
 
 head(df_inspected[, c(1:6, 21)], 1)
 ```
+
 ```{r, message=FALSE, warning=FALSE}
 write.csv(df_inspected, file="cleaned_report.csv", row.names=FALSE)
 ```
-We also filtered out the most recent grades for individual restaurants as a seperate csv file, which can be helpful for us to explore the current grades for restaurants. This seperate dataset contains 25,147 restaurants with grade levels in "A", "B", "C" or "Grading Pending".
+We also filtered out the most recent grades for individual restaurants as a separate csv file, which can be helpful for us to explore the current grades for restaurants. This separate dataset contains 25,147 restaurants with grade levels in "A", "B", "C" or "Grading Pending".
 ```{r, results='hide', message=FALSE, warning=FALSE}
 Inspections <- df_inspected %>%
     filter(((`INSPECTION.TYPE` %in% 
@@ -183,7 +184,7 @@ df_recent <- distinct(df_recent)
 #Save to csv
 write.csv(df_recent, file="recent_grade_per_restaurant_report.csv", row.names=FALSE)
 ```
-At the end of this section, we have a cleaned dataset with 382,310 records and 22 variables, which still contains a number of missing values due to the nature of this dataset. We also have a new dataset with 25,147 records of most recent grade for each restaurant and 12 variables, including the basic information of these restaurants.
+At the end of this section, we have a cleaned dataset with 382,310 records and 22 variables, which still contains a number of missing values due to the nature of this dataset. We also have a new dataset with 25,147 records of the most recent grade for each restaurant and 12 variables, including the basic information of these restaurants.
 
 # IV. Analysis of missing values
 
@@ -265,9 +266,9 @@ knitr::include_graphics('vio5.jpeg')
 
 ### Recent Grades of Restaurants
 
-After filtering out the most recent grade for each restaurant, we could take a further look into the current status regarding to the health and safety issues of the restaurants in New York City.
+After filtering out the most recent grade for each restaurant, we could take a further look into the current status regarding the health and safety issues of the restaurants in New York City.
 
-It's comforting to know that over 90 percentage of restaurants inspected in NYC have been graded as "A" and the results do not vary much in each borough, which indicates that the overall results of the most recent inspectation are quite positve.
+It's comforting to know that over 90 percent of restaurants inspected in NYC have been graded as "A" and the results do not vary much in each borough, which indicates that the overall results of the most recent inspections are quite positive.
 ```{r}
 ggplot(df_recent, aes(GRADE)) + 
   geom_bar(fill = "#196c91") + 
@@ -296,7 +297,7 @@ ggplot(gr_bo, aes(x = factor(BORO), y = percentage, fill = fct_rev(GRADE))) +
 
 However, if we look into different cuisine types, we found out that the `GRADE` level varies. 
 
-There are several cuisine types that all the restaurants graded as "A", such as "Afghan", "Armenian", "Basque", "Chilean", "Czech", "Egyptian", etc. And several cuisine types have relatively high percentage of restaurants graded as "B" or "C", such as "Moroccan", "English", "Iranian", etc.
+There are several cuisine types that all the restaurants graded as "A", such as "Afghan", "Armenian", "Basque", "Chilean", "Czech", "Egyptian", etc. And several cuisine types have a relatively high percentage of restaurants graded as "B" or "C", such as "Moroccan", "English", "Iranian", etc.
 ```{r}
 gr_bo <- df_recent %>% 
   group_by(`CUISINE.DESCRIPTION`,GRADE) %>% 
@@ -318,14 +319,13 @@ ggplotly(re_bo)
 ```
 
 ### Other Findings
-Although it shows that the majority of the restaurants are graded as "A" at this moment, aftering inspecting the detailed inspection results history of several "Grade A" restaurants, we noticed that there still exists some violations that make us worried as a customer. We do not think it is wise for us to purely reply on the letter grades to make judgement.
+Although it shows that the majority of the restaurants are graded as "A" at this moment, after inspecting the detailed inspection results history of several "Grade A" restaurants, we noticed that there still exists some violations that make us worried as a customer. We do not think it is wise for us to purely rely on the letter grades to make the judgment.
 
 # VI. Interactive component
 
-Welcome to the most interesting and inspiring part of this project. The main idea of this part is to allow users themselves to inspect and explore the inspection results of restaurants in New York City. So, we built the shiny app for users to interactive with data and different graphs in a comfortable and flexible way. You can find the app here: https://sheenxx.shinyapps.io/93_graph_proj/.
+Welcome to the most interesting and inspiring part of this project. The main idea of this part is to allow users themselves to inspect and explore the inspection results of restaurants in New York City. So, we built the shiny app for users to interact with data and different graphs in a comfortable and flexible way. You can find the app here: https://sheenxx.shinyapps.io/93_graph_proj/.
 
-The app is constructed with three parts. The first part is the Home page section which briefly introduces the project and the team members who contributed to this. The second part is the 2D map section which enables users to explore the most recent grade for the restaurants of their interests with some options. The final part is the Summary Statistics section which displays several types of plots to explore different aspects within the inspectation results.
-
+The app is constructed with three parts. The first part is the Home page section which briefly introduces the project and the team members who contributed to this. The second part is the 2D map section which enables users to explore the most recent grade for the restaurants of their interests with some options. The final part is the Summary Statistics section which displays several types of plots to explore different aspects within the inspection results.
 ```{r}
 knitr::include_graphics('image1.png')
 knitr::include_graphics('image2.png')
@@ -345,54 +345,52 @@ knitr::include_graphics('image6.png')
 
 Of course, if you don’t have a restaurant in mind, the "Cuisine Style" selection will help you to explore certain styles of restaurants you might be interested in. You can also combine this function with the "ZIPCODE" section based on the regions, like where you live in and where you often eat outside. 
 
-For us, we will just select our favorite cuisine style and enter the zip code where we live. Then the app shows all restaurants of that cuisine style in our inspection result dataset. By clicking those restaurants, we can have more detailed information.
+For us, we will just select our favorite cuisine style and enter the zip code where we live. Then the app shows all the restaurants of that cuisine style in our inspection result dataset. By clicking those restaurants, we can have more detailed information.
 ```{r}
 knitr::include_graphics('image7.png')
 ```
 
-If your curiosity is based on the grade of each restaurants, you can change the "Grade of Restaurant" selection. The range of grade is from "A" to "C" along with the "Grade Pending". 
+If your curiosity is based on the grade of each restaurant, you can change the "Grade of Restaurant" selection. The range of grade is from "A" to "C" along with the "Grade Pending". 
 
-Interestingly, you will actually find out that even those restaurants graded as "A" still have violations that seems to be serious to us customers, such as "Food contact surface not properly washed, rinsed and sanitized after each use and following any activity when contamination may have occurred." So we suggest that we do not determine whether a restaurant is good or not merely based on those grades.
+Interestingly, you will actually find out that even those restaurants graded as "A" still have violations that seem to be serious to us customers, such as "Food contact surface not properly washed, rinsed and sanitized after each use and following any activity when contamination may have occurred." So we suggest that we do not determine whether a restaurant is good or not merely based on those grades.
 ```{r}
 knitr::include_graphics('image8.png')
 ```
 
 # VII. Conclusion
-(Discuss limitations and future directions, lessons learned.)
 
-In the data preprocessing part, we found out that this dataset could be one of the most "hard-to-work-with" raw datasets we have ever encountered. It was generated by the real world activities and intergrated from multiple data source systems, which leads to the issues of missing values, manual input, data inconsistency, regional formats, wrong data types, etc. By dealing with this dataset, we have spent lots of time learning how to handling above issues and realized that during data analysis process under the real-world business context, preprocessing information is as important as creating a good model.
+In the data preprocessing part, we found out that this dataset could be one of the most "hard-to-work-with" raw datasets we have ever encountered. It was generated by the real world activities and integrated from multiple data source systems, which leads to the issues of missing values, manual input, data inconsistency, regional formats, wrong data types, etc. By dealing with this dataset, we have spent lots of time learning how to handling above issues and realized that during data analysis process under the real-world business context, preprocessing information is as important as creating a good model.
 
 During the data processing part, there are several issues that we are not able to properly resolve:
 
-* Some chain brands that has multiple stores in NYC, while the names for these stores can be slightly different, which is hard to identify and unify the names in an efficient way.
+* Some chain brands have multiple stores in NYC, while the names for these stores can be slightly different, which is hard to identify and unify the names in an efficient way.
 
-* Most of the missing values can not be filled using current information.
+* Most of the missing values cannot be filled using current information.
 
-* Some location related variables are wrong in formats or not consistent with each other, which is also hard to identify and unify the names in an efficient way.
+* Some location related variables are wrong in formats or not consistent with each other, which is also hard to identify and unify in an efficient way.
 
-* Although the `GRADE` comes from `SCORE`, there are some inconsistency due to the inspection and adjudication process and we can not resolve it without additional information.
+* Although the `GRADE` comes from `SCORE`, there is some inconsistency due to the inspection and adjudication process and we can not resolve it without additional information.
 
-There are some we can figure out a better way to present:
+There are some graphs that we can figure out a better way to present:
 
 * To present the missing value patterns, due to the large size of this dataset, we did not have much choice to plot a better graph.
 
-* There are quite a lot cuisine types in the graph of "Percentage of Grades for Each Cuisine Type in NYC", and the x axis text can be messy, so we hide them by setting the font color as white and allow users to explore the cuisine types interactively using plotly.
+* There are quite a lot cuisine types in the graph of "Percentage of Grades for Each Cuisine Type in NYC", and the x-axis text can be messy, so we hide them by setting the font color as white and allow users to explore the cuisine types interactively using plotly.
 
 We have done some specific preprocessing of the dataset for the Shiny app and there are some drawbacks as well:
 
-* Before connecting the dataset to the Shiny app, we had to further clean the dataset so that it won’t explode the load of Shiny server. Since our original dataset is huge and it has 383,587 records and 18 variables, we can’t directly put them into map. 
+* Before connecting the dataset to the Shiny app, we had to further clean the dataset so that it won’t explode the load of Shiny server. Since our original dataset is huge and it has 383,587 records and 18 variables, we can’t directly put them into the map. 
 
-* One of the major problems is that for each restaurant, there are multiple violation records in one inspection date. So we did put all those descriptions into the map as it will make the map very messy. Instead, what we did is to count each type of violations for each restaurants and picked the most frequent one. 
+* One of the major problems is that for each restaurant, there are multiple violation records in one inspection date. So we did put all those descriptions into the map as it will make the map very messy. Instead, what we did is to count each type of violations for each restaurant and picked the most frequent one. 
 
-* Since the original dataset doesn’t provide us the exact coordinates of each restaurant, we connected to Google’s API to extract an approximate location. Fortunately , the original dataset has full address of each restaurant so that the location we extracted from Google should be very accurate. 
+* Since the original dataset doesn’t provide us the exact coordinates of each restaurant, we connected to Google’s API to extract an approximate location. Fortunately, the original dataset has the full address of each restaurant so that the location we extracted from Google should be very accurate. 
 
 In the future, we would like to make further attempts into the following aspects:
 
-* For one specific chain brand, for now, we treated its stores as independent business identities. In the future, we can look into a chain brand combining all its stores, and to see if there is any difference in the inspection results among its stores.
+* For one specific chain brand, for now, we treated its stores as independent business identities. In the future, we can look into a chain brand combining all its stores, and see if there is any difference in the inspection results among its stores.
 
 * We have not tracked or compared the inspection records for each restaurant based on the timeline, one reason of which is due to the nature of this dataset as we mentioned in the data description section. However, we still could look into the dates to see if they can reveal anything interesting.
 
 * We can combine other datasets, such as the disease data, with this restaurant inspection results, to explore other interesting topics.
 
 * For the 2D map in our shinyapp, it would be more insightful if we could include the detailed history of the inspection results for each restaurant. And it would be more user friendly if we provide suggestions based on users typing in the option of "Search Your Restaurant". In the future, we could develop it into a restaurant search engine which has better user experience and provides more detailed information for each restaurant and can be linked to outside information, such as Yelp pages.
-
