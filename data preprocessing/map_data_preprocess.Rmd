@@ -1,0 +1,40 @@
+---
+title: "data_process"
+output: html_document
+---
+
+```{r}
+library(tibble)
+library(tidyverse) 
+library(dplyr)
+library(Hmisc)
+library(funModeling)
+library(stringr)
+library(readr)
+library(ggmap)
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE)
+
+```
+
+```{r}
+# join grade data
+###
+df <- readr::read_csv("grade_lon_lat.csv")
+#get lat lon
+df_lat_lon<- df%>%distinct(CAMIS,.keep_all = TRUE)%>%select(CAMIS,DBA,BUILDING,STREET)
+
+register_google(key ="")#google cloud API Key
+
+new_df <- df_lat_lon %>%mutate(ADDRESS_Ext = paste(BUILDING,STREET,"New York, NY",sep = ","))%>%mutate_geocode(ADDRESS_Ext)
+write.csv(new_df,"new_lat_lon.csv")
+
+grade_per_rest<-readr::read_csv("recent_grade_per_restaurant_ALL.csv")
+lon_lat<- readr::read_csv("new_lat_lon.csv")
+lon_lat<-lon_lat %>%select(CAMIS,lon,lat)
+grad_lon_lat<- grade_per_rest%>%inner_join(lon_lat,by = "CAMIS")
+write.csv(grad_lon_lat,"grade_lon_lat.csv")
+```
