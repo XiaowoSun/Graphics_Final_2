@@ -28,11 +28,16 @@ bubble_plot <- function(df, cuisine_style, num_top) {
 bar_vio_plot <- function(df,cuisine_style,num_top,critical_flag) {
   
   if (cuisine_style == "ALL") {
-  df<-df%>%filter(CRITICAL.FLAG==critical_flag)%>%group_by(VIOLATION.CODE)%>%count(VIOLATION.DESCRIPTION)%>%ungroup()%>%top_n(num_top)
+  df<-df%>%filter(CRITICAL.FLAG==critical_flag)%>%group_by(VIOLATION.CODE)%>%
+    count(VIOLATION.DESCRIPTION)%>%ungroup()%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
+  
+  
     }
   else {
-    df<-df%>%filter(CRITICAL.FLAG==critical_flag & CUISINE.DESCRIPTION==cuisine_style)%>%group_by(VIOLATION.CODE)%>%count(VIOLATION.DESCRIPTION)%>%ungroup()%>%top_n(num_top)
-  }
+    df<-df%>%filter(CRITICAL.FLAG==critical_flag & CUISINE.DESCRIPTION==cuisine_style)%>%group_by(VIOLATION.CODE)%>%
+      count(VIOLATION.DESCRIPTION)%>%ungroup()%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
+  
+    }
   
   ##str_wrap!! 666
  p<- plot_ly(data=df, x = ~VIOLATION.CODE, y = ~n ,type = 'bar',hovertext = str_wrap( df$VIOLATION.DESCRIPTION,width = 25))%>%

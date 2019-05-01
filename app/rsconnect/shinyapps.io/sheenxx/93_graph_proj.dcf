@@ -5,8 +5,9 @@ account: sheenxx
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 901408
-bundleId: 2051123
+bundleId: 2051407
 url: https://sheenxx.shinyapps.io/93_graph_proj/
-when: 1556663047.48262
+when: 1556670629.80547
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: pictures
