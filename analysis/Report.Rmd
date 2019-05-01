@@ -1,0 +1,398 @@
+---
+title: "Report - NYC Restaurant Inspection"
+author: "Xiaowo Sun, Xia Xin"
+date: "4/28/2019"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(tibble)
+library(tidyverse) 
+library(dplyr)
+library(Hmisc)
+library(funModeling)
+library(stringr)
+library(readr)
+library(mi)
+library(ggplot2)
+library(plotly)
+library(extracat)
+```
+
+# I. Introduction 
+
+New York City is a heaven for food-loving people, who will find many opportunities to sample cuisine from all cultures and at every price level, from street vendors to the finest high-end restaurants. The challenge for us foodies may be in determining which place to go to so that we can enjoy a fantastic meal.
+
+However, there were several times for us that, although the food tasted great, we felt sick or uncomfortable afterwards and thought it might have something to do with the food. Sometimes it can be hard to tell if it is the food poisoning or something else, but if we pay attention to the food safety and health issues while choosing a restaurant, the chance of getting foodborne illness can be elimiated.
+
+Therefore, we would like to take a look into the restaurant inspection conducted by the Department of Health and Mental Hygiene (DOHMH), in order to gain some insights and have a sense of the food safety issues for the restaurants in New York City.
+
+# II. Description of the data source
+
+We are using the Restaurant Inspection Data provided by the Department of Health and Mental Hygiene (DOHMH) from NYC Open Data for this project(https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/43nn-pn8j). Since this is a daily updated dataset, we are using the version which was updated by April 18, 2019.
+
+The Health Department conducts unannounced inspections of restaurants at least once a year. Inspectors check for compliance in food handling, food temperature, personal hygiene and vermin control. Each violation of a regulation gets a certain number of points. At the end of the inspection, the inspector totals the points and this number is the restaurant's inspection score — the lower the score, the better the grade. A score of 0-13 results in a grade of A; 14-27 points, a B; and 28 or more points, a C. Starting in July 2010, New York City has required restaurants to post letter grades that correspond to scores received from sanitary inspections. Grade cards must be posted where they can easily be seen by people passing by.
+
+The raw dataset has 383,587 records and 18 variables, including categorical, numerical and date variables. It contains NYC restaurant inspection results for up to three years prior to the most recent inspection for over 25,000 restaurants. In this dataset, when an inspection results in more than one violation, values for associated fields are repeated for each additional violation record. There are 8 variables showing the basic information of each restaurant, such as the restaurant name, location, phone number and cuisine type. The others describe several aspects of each inspection, such as the inspection date, inspection type, violation details, score, grade, grade date, etc.
+
+### Known Issues 
+
+According to the DOHMH, restaurants that go out of business are removed. In addition, scores current as of today may be revised due to adjudication in subsequent weeks or months, as restaurants can choose to go through the adjudication process or use other rights to argue their cases, which could take weeks even months. Therefore, we can see that this dataset is not valid enough to compare current scores to scores from previous years.
+
+Records are also included for each restaurant that has applied for a permit but has not yet been inspected with inspection date of 01/01/1900. Since we are only interested in the restaurants that have been inspected, these records will be ignored in our project.
+
+In addition, this dataset is compiled from several large administrative data systems, which leads to missing values and some illogical values that could be a result of data entry or transfer errors.
+
+# III. Description of data import / cleaning / transformation
+
+The dataset was obtained as one single large csv file, which contains blank cells and different values indicating missing values in certain columns. After checking the data dictionary file provided, we set some of those values as `NA` while importing the dataset into R, and dealt with the others in the later process. It has variables named as `CAMIS` (Unique ID for Restaurant), `DBA` (Restaurant Name), `BORO` (Borough), `BUILDING`, `STREET`, `ZIPCODE`, `PHONE`, `CUISINE DESCRIPTION`, `INSPECTION DATE`, `ACTION`, `VIOLATION CODE`, `VIOLATION DESCRIPTION`, `CRITICAL FLAG`, `SCORE`, `GRADE`, `GRADE DATE`, `RECORD DATE` and `INSPECTION TYPE`.
+```{r, message=FALSE, warning=FALSE}
+df = read.csv("../../DOHMH_New_York_City_Restaurant_Inspection_Results.csv", 
+              na.strings=c(c("", "N/A"), "NA"), stringsAsFactors=FALSE)
+```
+Since we are only interested in the restaurants that have been inspected, we removed the records with inspection dates of 01/01/1900 as mentioned before. The data type of `SCORE` is kept as integer, `INSPECTION.DATE` and `GRADE.DATE` as date, while the others as character.
+```{r, message=FALSE, warning=FALSE}
+# ignore restaurants that have not been inspected
+df_inspected = df[df$INSPECTION.DATE!="01/01/1900",]
+# convert data type
+df_inspected$CAMIS = as.character(df_inspected$CAMIS)
+df_inspected$ZIPCODE = as.character(df_inspected$ZIPCODE)
+df_inspected$INSPECTION.DATE.convert = as.Date(df_inspected$INSPECTION.DATE, "%m/%d/%Y")
+df_inspected$GRADE.DATE.convert = as.Date(df_inspected$GRADE.DATE, "%m/%d/%Y")
+```
+Then we examined each variable to deal with the missing or illogical values. Only issues that have been resolved are mentioned at this stage. 
+
+For `BORO`, there are 148 cells of 8 restaurants having values as "missing". After checking these 8 restaurants, we found out that all of these "missing" values can be replaced by the true borough values by looking into `BUILDING`, `STREET`, `ZIPCODE` on the Google Map.
+```{r, message=FALSE, warning=FALSE}
+#df_inspected[df_inspected$BORO=="Missing",]
+#unique(df_inspected[df_inspected$BORO=="Missing",]$CAMIS)
+df_inspected$BORO[df_inspected$CAMIS == "40883586"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50005059"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50005134"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50011555"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50043829"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50047425"] <- "MANHATTAN"
+df_inspected$BORO[df_inspected$CAMIS == "50049804"] <- "BROOKLYN"
+df_inspected$BORO[df_inspected$CAMIS == "50060598"] <- "MANHATTAN"
+
+ggplot(df_inspected, aes(x=fct_rev(fct_infreq(BORO)))) + 
+  geom_bar(fill = "#196c91") + coord_flip() + 
+  xlab("Number of Inspection Records") +
+  ylab("Boroughs in NYC") + 
+  ggtitle("Number of Inspection Records by Boroughs in NYC") + theme_grey(14)
+
+```
+For `ZIPCODE`, most of the missing value can be filled with the help of Google Geocoding.
+
+For `PHONE`, there are some special characters that represents the missing digits in the phone numbers. Some phone numbers have less than 10 digits or simply consist of 10 digits of "0". We converted these values as `NA` at this moment.
+```{r, message=FALSE, warning=FALSE}
+sp_char <- "_"
+df_inspected$PHONE  <- gsub(sp_char, "", df_inspected$PHONE)
+df_inspected$PHONE[nchar(df_inspected$PHONE) != 10] <- NA 
+df_inspected$PHONE[df_inspected$PHONE=='0000000000'] <- NA
+```
+For `CUISINE.DESCRIPTION`, we simply modified the name of type "CafÃ©/Coffee/Tea" to "Cafe/Coffee/Tea" and did some aggregarion.
+```{r, message=FALSE, warning=FALSE}
+df_inspected$CUISINE.DESCRIPTION[df_inspected$CUISINE.DESCRIPTION == "CafÃ©/Coffee/Tea"] <- "Cafe/Coffee/Tea"
+df_inspected$CUISINE.DESCRIPTION[df_inspected$CUISINE.DESCRIPTION == "Creole"] <- "Creole/Cajun"
+df_inspected$CUISINE.DESCRIPTION[df_inspected$CUISINE.DESCRIPTION == "Cajun"] <- "Creole/Cajun"
+```
+For `SCORE`, it is the only numerical variable in our dataset and has lots of missing values. We noticed that there are some values as -1, which is illogical as the lowest score can only be 0 according to the data dictionary file provided. Thus, we made these values as `NA` at this stage. We can see most of the scores are in range 0 to 50.
+```{r, message=FALSE, warning=FALSE}
+summary(df_inspected$SCORE)
+df_inspected$SCORE[!is.na(df_inspected$SCORE) & df_inspected$SCORE == -1] <- NA
+
+ggplot(df_inspected, aes(SCORE)) + 
+  geom_histogram(binwidth=5, fill="#196c91") + 
+  xlab("") +
+  ylab("Scores") + 
+  ggtitle("Scores of Inspection Results") + theme_grey(14)
+```
+For `GRADE`, according to the data dictionary provided, there are six levels of grades: Not Yet Graded, A, B, C, Z, P. However, there is one more level "G" in the dataset with only 7 records. After looking into these records and comparing them with other grade levels, we figured out that the level "G" is similar to the level "P" and "Z", which indicate "Grade Pending" of different inspection status. Thus, we aggregated these three levels into a new level "Grade Pending" for the following analysis.
+```{r, message=FALSE, warning=FALSE}
+df_inspected[!is.na(df_inspected$GRADE) & (df_inspected$GRADE %in% c("Z","P","G")),]$GRADE <- "Grade Pending"
+
+ggplot(df_inspected, aes(GRADE)) + 
+  geom_bar(fill = "#196c91") + 
+  xlab("Grade") + 
+  ylab("Number of Inspection Records") +
+  ggtitle("Number of Inspection Records by Grades in NYC") + theme_grey(14)
+```
+In addition, we added a new variable named `Address`, which combines the values of `BUILDING`, `STREET`, `BORO` and `ZIPCODE` into one column for potential implementation in the future. For example, 
+```{r, message=FALSE, warning=FALSE}
+df_inspected$Address = paste(df_inspected$BUILDING, df_inspected$STREET, sep=" ")
+df_inspected$Address = paste(df_inspected$Address, df_inspected$BORO, sep=", ")
+df_inspected$State <- paste('NY', df_inspected$ZIPCODE, sep=" ")
+df_inspected$Address = paste(df_inspected$Address, df_inspected$State, sep=", ")
+
+head(df_inspected[, c(1:6, 21)], 1)
+```
+```{r, message=FALSE, warning=FALSE}
+write.csv(df_inspected, file="cleaned_report.csv", row.names=FALSE)
+```
+We also filtered out the most recent grades for individual restaurants as a seperate csv file, which can be helpful for us to explore the current grades for restaurants. This seperate dataset contains 25,147 restaurants with grade levels in "A", "B", "C" or "Grading Pending".
+```{r, results='hide', message=FALSE, warning=FALSE}
+Inspections <- df_inspected %>%
+    filter(((`INSPECTION.TYPE` %in% 
+            c('Cycle Inspection / Re-inspection'
+              ,'Pre-permit (Operational) / Re-inspection')
+          |(`INSPECTION.TYPE` %in%
+              c('Cycle Inspection / Initial Inspection'
+                ,'Pre-permit (Operational) / Initial Inspection')) 
+          & SCORE <= 13)
+         | (`INSPECTION.TYPE` %in%  
+              c('Pre-permit (Operational) / Reopening Inspection'
+                ,'Cycle Inspection / Reopening Inspection')))
+         & GRADE %in% c('A', 'B', 'C', 'Grade Pending')) %>%
+  select(CAMIS,`INSPECTION.DATE`)
+
+#Select distinct inspections
+Inspections_Distinct <- distinct(Inspections)
+
+#Select most recent inspection date
+MostRecentInsp <- Inspections_Distinct %>%
+  group_by(CAMIS) %>%
+  slice(which.max(as.Date(`INSPECTION.DATE`,'%m/%d/%Y')))
+
+#Join most recent inspection with original dataset
+inner_join(df_inspected, MostRecentInsp, by = "CAMIS","INSPECTION.DATE")
+
+#Select restaurant inspection data based on most recent inspection date
+df_recent <- df_inspected %>% inner_join(MostRecentInsp) %>%
+    filter((`INSPECTION.TYPE` %in% 
+            c('Cycle Inspection / Re-inspection'
+              ,'Pre-permit (Operational) / Re-inspection'
+              , 'Pre-permit (Operational) / Reopening Inspection' 
+              ,'Cycle Inspection / Reopening Inspection')
+          |(`INSPECTION.TYPE` %in%
+              c('Cycle Inspection / Initial Inspection'
+                ,'Pre-permit (Operational) / Initial Inspection')) 
+          & SCORE <= 13)) %>%
+  select(CAMIS,DBA,Address,BORO,BUILDING,STREET,ZIPCODE,`CUISINE.DESCRIPTION`,
+         `INSPECTION.DATE`,GRADE,`INSPECTION.TYPE`,SCORE)
+
+#Select distinct restaurant inspection data
+df_recent <- distinct(df_recent)
+
+#Save to csv
+write.csv(df_recent, file="recent_grade_per_restaurant_report.csv", row.names=FALSE)
+```
+At the end of this section, we have a cleaned dataset with 382,310 records and 22 variables, which still contains a number of missing values due to the nature of this dataset. We also have a new dataset with 25,147 records of most recent grade for each restaurant and 12 variables, including the basic information of these restaurants.
+
+# IV. Analysis of missing values
+
+This dataset contains a large number of missing values due to its nature and we have noticed several patterns.
+```{r, message=FALSE, warning=FALSE}
+df_na <- df_inspected[,1:18]
+
+missing.values <- df_na %>%
+  gather(key = "key", value = "val") %>%
+  mutate(isna = is.na(val)) %>%
+  group_by(key) %>%
+  mutate(total = n()) %>%
+  group_by(key, total, isna) %>%
+  summarise(num.isna = n()) %>%
+  mutate(pct = num.isna / total * 100)
+
+levels <-
+    (missing.values  %>% filter(isna == T) %>% arrange(desc(pct)))$key
+
+Variable = reorder(missing.values$key, desc(missing.values$pct))
+
+percentage.plot <- missing.values %>%
+      ggplot() +
+        geom_bar(aes(x = Variable, 
+                     y = pct, fill=isna), 
+                 stat = 'identity', alpha=0.8) +
+      scale_x_discrete(limits = levels) +
+      scale_fill_manual(name = "Missing Values", 
+                        values = c("#196c91", "#f8c032"), labels = c("Present", "Missing")) +
+      coord_flip() +
+      labs(title = "Percentage of Missing Values", x =
+             'Variables with Missing Values', y = "% of Missing Values")
+
+#percentage.plot
+per_na <- ggplotly(percentage.plot)
+per_na
+```
+There is no missing value in the variables of `CAMIS`, `DBA`, `BORO`, `STREET`, `CUISINE DESCRIPTION`, `INSPECTION DATE`, `ACTION`, `CRITICAL FLAG`, `RECORD DATE` and `INSPECTION TYPE`.
+
+Based on the results by using `mi` package (which was too large to be knit into html file), we have detected 14 patterns of missing values and the top 3 of them are
+* `GRADE DATE`, `GRADE`
+* `GRADE DATE`, `GRADE`, `SCORE`
+* `GRADE DATE`, `GRADE`, `SCORE`, `CRITICAL.FLAG`, `VIOLATION.CODE`, `VIOLATION.DESCRIPTION`
+
+`GRADE DATE` and `GRADE` have the most missing values. We can see that almost all the records with the missing values in `GRADE` have missing values in `GRADE DATE`.
+
+For `GRADE`, according to the DOHMH, there are two main reasons for the missing value in this variable.
+
+* Letter grades are not issued to several types of businesses, such as the mobile food vending units, food service establishments operated by primary or secondary schools, hospital-operated cafeterias, correctional facilities, charitable organizations and not-for-profit membership organizations that serve food only to their members. 
+
+* Not every inspection is gradable. There are only two types of inspections that result in a letter grade: initial inspections for which the restaurant earns an A, and re-inspections that result in an A, B or C. 
+
+When the value of `SCORE` is missing, it is reasonable that there is no `GRADE DATE`, `GRADE`.
+
+When the values of `CRITICAL.FLAG` are "NOT APPLICABLE"", the corresponding `VIOLATION.DESCRIPTION` values will be not applicable, which makes sense.
+```{r, fig.height=10, fig.width=12}
+#x <- missing_data.frame(df_na[, 9:18])
+#class(x)
+#x@patterns
+#levels(x@patterns)
+#summary(x@patterns)
+visna(df_na, sort = "b")
+```
+(Notes: In this missing value pattern graph, the blue blocks indicate the missing values by rows and by columns. The red section at the bottom provides a general sense of the percentage of missing values in each columns. The dark grey section at the right provides a general sense of the percentage of missing values in each pattern.)
+
+# V. Results
+
+### Inspection Results by Violation Records
+
+There are 99 violation items that will be examined during an inspectation. Some of them are critical and the others are not critical. We found out that the top violation item code that is critical is "02B", which is corresponding to the description of "Hot food item not held at or above 140F", and the top violation item that is not critical is "08A", which is corresponding to the description of "Facility not vermin proof. Harborage or conditions conducive to attracting vermin to the permises and/or allowing vermin to exist". 
+```{r}
+knitr::include_graphics('vio1.jpeg')
+knitr::include_graphics('vio3.jpeg')
+```
+We also found out the top 5 restaurants which have most violation records: "AZUSA OF JAPAN", "CAFE WATER", "JOHN'S FRIED CHICKEN", "VELLA", "PEKING DUCK HOUSE". We highly suggest that you think twice before you go to these restaurants.
+```{r}
+knitr::include_graphics('vio5.jpeg')
+```
+
+### Recent Grades of Restaurants
+
+After filtering out the most recent grade for each restaurant, we could take a further look into the current status regarding to the health and safety issues of the restaurants in New York City.
+
+It's comforting to know that over 90 percentage of restaurants inspected in NYC have been graded as "A" and the results do not vary much in each borough, which indicates that the overall results of the most recent inspectation are quite positve.
+```{r}
+ggplot(df_recent, aes(GRADE)) + 
+  geom_bar(fill = "#196c91") + 
+  xlab("Grade") + 
+  ylab("Number of Restaurants") +
+  ggtitle("Number of Restaurants by Grades in NYC") + theme_grey(14)
+```
+
+```{r}
+col_fill = c("#bf9854","#f8c032","#2096c7","#196c91")
+
+gr_bo <- df_recent %>% 
+  group_by(BORO,GRADE) %>% 
+  summarise(count=n()) %>% 
+  mutate(percentage=count/sum(count)*100)
+
+ggplot(gr_bo, aes(x = factor(BORO), y = percentage, fill = fct_rev(GRADE))) +
+  geom_bar(stat="identity", width = 0.7) +
+  scale_fill_manual(values = c("#bf9854","#f8c032","#196c91","#bde4fc")) + 
+  labs(x = "Borough", y = "percentage", fill = "") +
+  ggtitle("Percentage of Grades for Each Borough in NYC") +
+  theme_minimal(base_size = 12)
+
+
+```
+
+However, if we look into different cuisine types, we found out that the `GRADE` level varies. 
+
+There are several cuisine types that all the restaurants graded as "A", such as "Afghan", "Armenian", "Basque", "Chilean", "Czech", "Egyptian", etc. And several cuisine types have relatively high percentage of restaurants graded as "B" or "C", such as "Moroccan", "English", "Iranian", etc.
+```{r}
+gr_bo <- df_recent %>% 
+  group_by(`CUISINE.DESCRIPTION`,GRADE) %>% 
+  summarise(count=n()) %>% 
+  mutate(Percentage=count/sum(count)*100)
+
+Cuisine.Type = fct_reorder(factor(gr_bo$CUISINE.DESCRIPTION),-gr_bo$Percentage)
+Grade = fct_rev(gr_bo$GRADE)
+
+re_bo <- ggplot(gr_bo, aes(x = Cuisine.Type, y = Percentage, fill = Grade)) +
+  geom_bar(stat="identity", width = 0.7) +
+  scale_fill_manual(values = c("#bf9854","#f8c032","#196c91","#bde4fc")) + 
+  labs(x = "Cuisine Type", y = "percentage", fill = "") +
+  ggtitle("Percentage of Grades for Each Cuisine Type in NYC") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(color = "white"))
+
+ggplotly(re_bo)
+```
+
+### Other Findings
+Although it shows that the majority of the restaurants are graded as "A" at this moment, aftering inspecting the detailed inspection results history of several "Grade A" restaurants, we noticed that there still exists some violations that make us worried as a customer. We do not think it is wise for us to purely reply on the letter grades to make judgement.
+
+# VI. Interactive component
+
+Welcome to the most interesting and inspiring part of this project. The main idea of this part is to allow users themselves to inspect and explore the inspection results of restaurants in New York City. So, we built the shiny app for users to interactive with data and different graphs in a comfortable and flexible way. You can find the app here: https://sheenxx.shinyapps.io/93_graph_proj/.
+
+The app is constructed with three parts. The first part is the Home page section which briefly introduces the project and the team members who contributed to this. The second part is the 2D map section which enables users to explore the most recent grade for the restaurants of their interests with some options. The final part is the Summary Statistics section which displays several types of plots to explore different aspects within the inspectation results.
+
+```{r}
+knitr::include_graphics('image1.png')
+knitr::include_graphics('image2.png')
+knitr::include_graphics('image9.png')
+knitr::include_graphics('image4.png')
+knitr::include_graphics('image5.png')
+```
+
+In the 2D map section, we set some options such as "Search your restaurant", "Cuisine Style", "Grade of Restaurant" and "ZIPCODE" for users to make their own decisions. 
+
+For example, for us, what we are curious about are those restaurants we often eat with friends, as we want to check how likely it will cause us health issues such as food poisoning. One of the largest concerns for users is to check certain types of violations of each restaurant. So we could use the search bar to type in the name of restaurants and click the "Result" button below. Then the restaurant will pop up in the map with the detail information such as contact information, the top recent violation description and the inspection date, etc. 
+
+We searched the restaurant "UNCLE LUO YANG" near our campus and found out that the top recent violation is that "Cold food item held above 41º F" which is kind dangerous as the food will grow pathogens and cause food poisoning". 
+```{r}
+knitr::include_graphics('image6.png')
+```
+
+Of course, if you don’t have a restaurant in mind, the "Cuisine Style" selection will help you to explore certain styles of restaurants you might be interested in. You can also combine this function with the "ZIPCODE" section based on the regions, like where you live in and where you often eat outside. 
+
+For us, we will just select our favorite cuisine style and enter the zip code where we live. Then the app shows all restaurants of that cuisine style in our inspection result dataset. By clicking those restaurants, we can have more detailed information.
+```{r}
+knitr::include_graphics('image7.png')
+```
+
+If your curiosity is based on the grade of each restaurants, you can change the "Grade of Restaurant" selection. The range of grade is from "A" to "C" along with the "Grade Pending". 
+
+Interestingly, you will actually find out that even those restaurants graded as "A" still have violations that seems to be serious to us customers, such as "Food contact surface not properly washed, rinsed and sanitized after each use and following any activity when contamination may have occurred." So we suggest that we do not determine whether a restaurant is good or not merely based on those grades.
+```{r}
+knitr::include_graphics('image8.png')
+```
+
+# VII. Conclusion
+(Discuss limitations and future directions, lessons learned.)
+
+In the data preprocessing part, we found out that this dataset could be one of the most "hard-to-work-with" raw datasets we have ever encountered. It was generated by the real world activities and intergrated from multiple data source systems, which leads to the issues of missing values, manual input, data inconsistency, regional formats, wrong data types, etc. By dealing with this dataset, we have spent lots of time learning how to handling above issues and realized that during data analysis process under the real-world business context, preprocessing information is as important as creating a good model.
+
+During the data processing part, there are several issues that we are not able to properly resolve:
+
+* Some chain brands that has multiple stores in NYC, while the names for these stores can be slightly different, which is hard to identify and unify the names in an efficient way.
+
+* Most of the missing values can not be filled using current information.
+
+* Some location related variables are wrong in formats or not consistent with each other, which is also hard to identify and unify the names in an efficient way.
+
+* Although the `GRADE` comes from `SCORE`, there are some inconsistency due to the inspection and adjudication process and we can not resolve it without additional information.
+
+There are some we can figure out a better way to present:
+
+* To present the missing value patterns, due to the large size of this dataset, we did not have much choice to plot a better graph.
+
+* There are quite a lot cuisine types in the graph of "Percentage of Grades for Each Cuisine Type in NYC", and the x axis text can be messy, so we hide them by setting the font color as white and allow users to explore the cuisine types interactively using plotly.
+
+We have done some specific preprocessing of the dataset for the Shiny app and there are some drawbacks as well:
+
+* Before connecting the dataset to the Shiny app, we had to further clean the dataset so that it won’t explode the load of Shiny server. Since our original dataset is huge and it has 383,587 records and 18 variables, we can’t directly put them into map. 
+
+* One of the major problems is that for each restaurant, there are multiple violation records in one inspection date. So we did put all those descriptions into the map as it will make the map very messy. Instead, what we did is to count each type of violations for each restaurants and picked the most frequent one. 
+
+* Since the original dataset doesn’t provide us the exact coordinates of each restaurant, we connected to Google’s API to extract an approximate location. Fortunately , the original dataset has full address of each restaurant so that the location we extracted from Google should be very accurate. 
+
+In the future, we would like to make further attempts into the following aspects:
+
+* For one specific chain brand, for now, we treated its stores as independent business identities. In the future, we can look into a chain brand combining all its stores, and to see if there is any difference in the inspection results among its stores.
+
+* We have not tracked or compared the inspection records for each restaurant based on the timeline, one reason of which is due to the nature of this dataset as we mentioned in the data description section. However, we still could look into the dates to see if they can reveal anything interesting.
+
+* We can combine other datasets, such as the disease data, with this restaurant inspection results, to explore other interesting topics.
+
+* For the 2D map in our shinyapp, it would be more insightful if we could include the detailed history of the inspection results for each restaurant. And it would be more user friendly if we provide suggestions based on users typing in the option of "Search Your Restaurant". In the future, we could develop it into a restaurant search engine which has better user experience and provides more detailed information for each restaurant and can be linked to outside information, such as Yelp pages.
+
