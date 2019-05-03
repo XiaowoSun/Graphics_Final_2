@@ -29,13 +29,13 @@ bar_vio_plot <- function(df,cuisine_style,num_top,critical_flag) {
   
   if (cuisine_style == "ALL") {
   df<-df%>%filter(CRITICAL.FLAG==critical_flag)%>%group_by(VIOLATION.CODE)%>%
-    count(VIOLATION.DESCRIPTION)%>%ungroup()%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
+    count(VIOLATION.DESCRIPTION)%>%ungroup()%>%arrange(desc(n))%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
   
   
     }
   else {
     df<-df%>%filter(CRITICAL.FLAG==critical_flag & CUISINE.DESCRIPTION==cuisine_style)%>%group_by(VIOLATION.CODE)%>%
-      count(VIOLATION.DESCRIPTION)%>%ungroup()%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
+      count(VIOLATION.DESCRIPTION)%>%ungroup()%>%arrange(desc(n))%>%slice(1:num_top)%>%mutate(VIOLATION.CODE = fct_reorder(VIOLATION.CODE, desc(n)))
   
     }
   
@@ -184,24 +184,13 @@ show_vio_map <- function(df,cuisine_style,grade,rest_search,zipcode) {
     df<- df%>%filter(str_detect(string = ZIPCODE,pattern = zipcode))
   }
 
-  ##get unique rest with number of violaiton counts
-  num_uniq_rest<- df %>%group_by(CAMIS)%>%count()%>%rename(num_violatinos = n)
+
   
-  ##join back
-  uniq <- df %>% inner_join(num_uniq_rest,by = "CAMIS")%>%distinct(CAMIS,.keep_all = TRUE)
-  
-  ##find out top desc for a unique rest
-  Top_1_desc<- df%>%group_by(CAMIS)%>%count(VIOLATION.DESCRIPTION,sort = TRUE)%>%top_n(1)%>%distinct(CAMIS,.keep_all = TRUE)%>%rename(num_desc = n)
-  
-  ##join desc
-  uniq<- uniq%>%select(-VIOLATION.DESCRIPTION)%>%inner_join(Top_1_desc,by="CAMIS")
-  
-  
-  m = leaflet(uniq) %>%setView(-73.98, 40.75, zoom = 10)%>%
+  m = leaflet(df) %>%setView(-73.98, 40.75, zoom = 10)%>%
     addProviderTiles("Esri") %>% 
     #addTiles()%>%
-    addMarkers(lng = uniq$lon,lat = uniq$lat,
-               popup=paste(uniq$DBA,"<br> Contact:",uniq$PHONE,"<br>",uniq$Address,"<br>***Top Recent Violation***<br>",uniq$INSPECTION.DATE,"<br>",uniq$VIOLATION.DESCRIPTION),
+    addMarkers(lng = df$lon,lat = df$lat,
+               popup=paste(df$DBA,"<br> Contact:",df$PHONE,"<br>",df$Address,"<br>***Top Violation***","<br>",df$VIOLATION.DESCRIPTION),
                clusterOptions = markerClusterOptions())
   
   return(m)

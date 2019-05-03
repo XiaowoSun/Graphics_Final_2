@@ -32,10 +32,23 @@ source("functions.R")
 
 ##read data & clean
 df <- readr::read_csv("./data/grade_lon_lat.csv")
+df_2d_map <- readr::read_csv("./data/old_version.csv")
 
 ###violation stores
 All_vio<-df%>%filter(ACTION!= "No violations were recorded at the time of this inspection.")
-Crit_vio <-All_vio%>%filter(CRITICAL.FLAG =="Critical")
+
+Crit_vio <-df_2d_map%>%filter(CRITICAL.FLAG =="Critical"&ACTION!= "No violations were recorded at the time of this inspection.")
+
+##get unique rest with number of violaiton counts
+#num_uniq_rest<- Crit_vio %>%group_by(CAMIS)%>%count()%>%rename(num_violatinos = n)
+##join back
+#uniq <- Crit_vio %>% inner_join(num_uniq_rest,by = "CAMIS")%>%distinct(CAMIS,.keep_all = TRUE)
+
+##find out top desc for a unique rest
+Top_1_desc<- Crit_vio%>%group_by(CAMIS)%>%count(VIOLATION.DESCRIPTION)%>%top_n(1)%>%distinct(CAMIS,.keep_all = TRUE)%>%rename(num_desc = n)
+
+##join desc
+most_freq_desc<- All_vio%>%filter(CRITICAL.FLAG =="Critical")%>%select(-VIOLATION.DESCRIPTION)%>%inner_join(Top_1_desc,by="CAMIS")%>%distinct(CAMIS,.keep_all = TRUE)
 
 
 ## Server function
@@ -62,7 +75,7 @@ With our app,users will inspect each restaurant of their interest and make their
   observeEvent(input$result_2D,output$vio_map<- renderLeaflet({
     
     
-    show_vio_map(df = Crit_vio,cuisine_style = input$style_2D,grade = input$grade_2D,rest_search = input$search2D,zipcode = input$zip_2D)
+    show_vio_map(df = most_freq_desc,cuisine_style = input$style_2D,grade = input$grade_2D,rest_search = input$search2D,zipcode = input$zip_2D)
     
     
   }))
